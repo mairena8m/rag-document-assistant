@@ -1,0 +1,4 @@
+El modelo U-Net++ MONAI obtuvo el mejor resultado en Dice con un valor de 0.571.
+La mejora respecto al segundo modelo fue baja, con una diferencia de 0.011.
+No se puede evaluar el sobreajuste sin curvas de entrenamiento y validación.
+Se recomienda complementar Dice con IoU y revisión visual de las máscaras.
