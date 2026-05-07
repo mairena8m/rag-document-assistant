@@ -17,9 +17,29 @@ def split_text(text: str, chunk_size: int = 1600, overlap: int = 200) -> list[st
         end = start + chunk_size
         chunk = clean_text[start:end]
 
-        if chunk.strip():
+        if chunk.strip() and not is_low_quality_chunk(chunk):
             chunks.append(chunk.strip())
 
         start += chunk_size - overlap
 
     return chunks
+
+def is_low_quality_chunk(chunk: str) -> bool:
+    lowered = chunk.lower()
+
+    bad_patterns = [
+        "índice de figuras",
+        "índice de tablas",
+        "referencias",
+        ". . . . .",
+        "lista de figuras",
+        "lista de tablas"
+    ]
+
+    if any(pattern in lowered for pattern in bad_patterns):
+        return True
+
+    if len(chunk.strip()) < 80:
+        return True
+
+    return False

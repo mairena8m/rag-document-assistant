@@ -32,20 +32,23 @@ def add_chunks(document_name: str, chunks: list[str], embeddings: list[list[floa
 def search_chunks(query_embedding: list[float], top_k: int = 4) -> list[dict]:
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=top_k
+        n_results=top_k,
+        include=["documents", "metadatas", "distances"]
     )
 
     documents = results.get("documents", [[]])[0]
     metadatas = results.get("metadatas", [[]])[0]
     ids = results.get("ids", [[]])[0]
+    distances = results.get("distances", [[]])[0]
 
     retrieved = []
 
-    for chunk_id, text, metadata in zip(ids, documents, metadatas):
+    for chunk_id, text, metadata, distance in zip(ids, documents, metadatas, distances):
         retrieved.append({
             "chunk_id": chunk_id,
             "text": text,
-            "document_name": metadata.get("document_name", "unknown")
+            "document_name": metadata.get("document_name", "unknown"),
+            "distance": distance
         })
 
     return retrieved

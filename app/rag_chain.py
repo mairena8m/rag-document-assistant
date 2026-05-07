@@ -29,7 +29,8 @@ def ask_question(question: str, top_k: int = 4) -> AskResponse:
         SourceChunk(
             document_name=chunk["document_name"],
             chunk_id=chunk["chunk_id"],
-            text=chunk["text"]
+            text=chunk["text"],
+            distance=chunk.get("distance")
         )
         for chunk in retrieved_chunks
     ]

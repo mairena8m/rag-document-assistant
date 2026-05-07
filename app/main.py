@@ -4,12 +4,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 
+from app.schemas import AskRequest, AskResponse, RetrievalSearchRequest, RetrievalSearchResponse
+from app.retrieval import search_relevant_chunks
 from app.config import UPLOADS_PATH
 from app.document_loader import load_document
 from app.text_splitter import split_text
 from app.embeddings import embed_texts
 from app.vector_store import add_chunks, list_documents, reset_collection
-from app.schemas import AskRequest, AskResponse
 from app.rag_chain import ask_question
 
 app = FastAPI(
@@ -89,3 +90,16 @@ def reset_documents():
     return {
         "status": "collection reset"
     }
+    
+@app.post("/retrieval/search", response_model=RetrievalSearchResponse)
+def retrieval_search(request: RetrievalSearchRequest):
+    try:
+        return search_relevant_chunks(
+            question=request.question,
+            top_k=request.top_k
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error recuperando chunks relevantes: {str(e)}"
+        )
