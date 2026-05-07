@@ -65,6 +65,8 @@ rag-document-assistant/
 │   ├── text_splitter.py
 │   ├── embeddings.py
 │   ├── vector_store.py
+│   ├── retrieval.py
+│   ├── retrieval_utils.py
 │   ├── rag_chain.py
 │   └── llm_client.py
 │
@@ -76,7 +78,8 @@ rag-document-assistant/
 │   └── sample_question.json
 │
 ├── tests/
-│   └── test_text_splitter.py
+│   ├── test_text_splitter.py
+│   └── test_retrieval.py
 │
 ├── .env.example
 ├── .gitignore
@@ -89,7 +92,7 @@ rag-document-assistant/
 
 ## Funcionamiento general
 
-El sistema se divide en dos fases principales:
+El sistema se divide en dos fases principales.
 
 ### 1. Indexación de documentos
 
@@ -257,7 +260,7 @@ Ejemplo de entrada:
 
 ```json
 {
-  "question": "¿Cuál es la conclusión principal del documento?",
+  "question": "¿Qué modelo obtuvo el mejor resultado?",
   "top_k": 4
 }
 ```
@@ -266,16 +269,64 @@ Ejemplo de respuesta:
 
 ```json
 {
-  "answer": "El documento concluye que los modelos de Deep Learning presentan un gran potencial para la segmentación de imágenes médicas...",
+  "answer": "El modelo U-Net++ obtuvo el mejor resultado global.",
   "sources": [
     {
       "document_name": "TFG_Memoria.pdf",
-      "chunk_id": "TFG_Memoria.pdf_75_94f7803c",
-      "text": "CAPÍTULO 4 Conclusiones y Trabajo Futuro..."
+      "chunk_id": "TFG_Memoria.pdf_60_1b6a0f93",
+      "text": "Tabla 3.8: Comparación de métricas para los modelos de segmentación...",
+      "distance": 0.5306985974311829
     }
   ]
 }
 ```
+
+La respuesta final se genera con Gemini a partir de los fragmentos recuperados del documento.
+
+---
+
+### Buscar chunks relevantes
+
+```http
+POST /retrieval/search
+```
+
+Este endpoint permite ver qué fragmentos recupera el sistema antes de generar una respuesta con Gemini.
+
+Sirve para depurar el comportamiento del RAG y comprobar si la búsqueda semántica está recuperando contexto útil.
+
+Ejemplo de entrada:
+
+```json
+{
+  "question": "¿Qué modelo obtuvo el mejor resultado?",
+  "top_k": 4
+}
+```
+
+Ejemplo de respuesta:
+
+```json
+{
+  "query": "¿Qué modelo obtuvo el mejor resultado?",
+  "results": [
+    {
+      "document_name": "TFG_Memoria.pdf",
+      "chunk_id": "TFG_Memoria.pdf_60_1b6a0f93",
+      "text": "El modelo U-Net++ se posiciona como la arquitectura con mejor desempeño global...",
+      "distance": 0.5306985974311829
+    },
+    {
+      "document_name": "TFG_Memoria.pdf",
+      "chunk_id": "TFG_Memoria.pdf_64_a87ded3b",
+      "text": "Tras la revisión, apuntó que U-Net++, FPN y PSPNet fueron los modelos que mejor trabajo desempeñaban...",
+      "distance": 0.5459016561508179
+    }
+  ]
+}
+```
+
+La distancia permite analizar la relevancia de los fragmentos recuperados. En general, una distancia menor indica mayor similitud entre la pregunta y el fragmento.
 
 ---
 
@@ -324,14 +375,24 @@ Invoke-RestMethod `
   -Uri "http://127.0.0.1:8000/ask" `
   -Method POST `
   -ContentType "application/json" `
-  -Body '{"question": "¿Cuál es la conclusión principal del documento?", "top_k": 4}'
+  -Body '{"question": "¿Qué modelo obtuvo el mejor resultado?", "top_k": 4}'
+```
+
+También se puede comprobar la recuperación de chunks sin generar respuesta final:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:8000/retrieval/search" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"question": "¿Qué modelo obtuvo el mejor resultado?", "top_k": 4}'
 ```
 
 ---
 
 ## Tests
 
-El proyecto incluye tests unitarios para comprobar el comportamiento del divisor de texto.
+El proyecto incluye tests unitarios para comprobar partes internas del sistema.
 
 Para ejecutar los tests:
 
@@ -339,18 +400,17 @@ Para ejecutar los tests:
 python -m pytest -v
 ```
 
-Actualmente se valida:
+Actualmente se validan aspectos como:
 
-- Que un texto largo se divide en varios chunks.
-- Que un texto vacío devuelve una lista vacía.
-- Que se lanza error si el `overlap` es mayor o igual que el `chunk_size`.
-- Que se lanza error si el `chunk_size` no es válido.
+- División de texto en chunks.
+- Comportamiento ante texto vacío.
+- Control de errores cuando `chunk_size` no es válido.
+- Control de errores cuando `overlap` es mayor o igual que `chunk_size`.
+- Filtrado de chunks por distancia.
+- Comportamiento del filtro cuando no hay chunks.
+- Comportamiento del filtro cuando no hay distancia disponible.
 
-Resultado esperado:
-
-```text
-4 passed
-```
+Los tests se centran en la lógica interna y no dependen directamente de Gemini ni de ChromaDB, para evitar que fallen por servicios externos o límites de cuota.
 
 ---
 
@@ -366,16 +426,17 @@ Limitaciones principales:
 - Si se usan documentos grandes con el free tier de Gemini, pueden aparecer errores de cuota o rate limit durante la generación de embeddings.
 - La base vectorial se almacena localmente en `data/chroma`.
 - No incluye autenticación ni control de usuarios.
-- No filtra todavía chunks poco informativos como índices, referencias o listados de figuras.
-- No calcula todavía puntuaciones de relevancia visibles para depurar la recuperación.
+- No filtra de forma avanzada todos los fragmentos poco informativos.
+- Las distancias de recuperación ayudan a depurar, pero no sustituyen una evaluación formal de calidad del RAG.
+- No incluye evaluación automática de fidelidad, alucinaciones o calidad de respuesta.
 
 ---
 
 ## Posibles mejoras futuras
 
 - Añadir limpieza avanzada del texto extraído de PDF.
-- Añadir filtrado de chunks poco relevantes.
-- Devolver la distancia o puntuación de relevancia de cada fuente recuperada.
+- Añadir filtrado más robusto de chunks poco relevantes.
+- Ajustar dinámicamente el número de chunks utilizados según la distancia.
 - Añadir soporte para documentos DOCX.
 - Añadir carga múltiple de documentos.
 - Añadir una interfaz web sencilla.
@@ -383,6 +444,7 @@ Limitaciones principales:
 - Añadir evaluación básica de respuestas RAG.
 - Añadir soporte para embeddings locales para evitar límites de cuota.
 - Añadir autenticación para proteger los endpoints.
+- Añadir tests de integración con documentos de ejemplo.
 
 ---
 
@@ -391,3 +453,5 @@ Limitaciones principales:
 Versión inicial funcional.
 
 El proyecto permite subir documentos PDF o TXT, generar embeddings, almacenarlos en ChromaDB y realizar preguntas sobre el contenido mediante una arquitectura RAG con Gemini.
+
+También incluye un endpoint de depuración para inspeccionar los fragmentos recuperados antes de generar la respuesta final.

@@ -2,15 +2,18 @@ from app.embeddings import embed_query
 from app.vector_store import search_chunks
 from app.llm_client import generate_answer
 from app.schemas import AskResponse, SourceChunk
+from app.retrieval_utils import filter_chunks_by_distance
 
 
 def ask_question(question: str, top_k: int = 4) -> AskResponse:
     query_embedding = embed_query(question)
     retrieved_chunks = search_chunks(query_embedding, top_k=top_k)
 
+    retrieved_chunks = filter_chunks_by_distance(retrieved_chunks)
+
     if not retrieved_chunks:
         return AskResponse(
-            answer="No hay documentos cargados o no se ha encontrado contexto relevante.",
+            answer="No hay documentos cargados o no se ha encontrado contexto suficientemente relevante.",
             sources=[]
         )
 

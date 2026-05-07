@@ -33,7 +33,10 @@ def is_low_quality_chunk(chunk: str) -> bool:
         "referencias",
         ". . . . .",
         "lista de figuras",
-        "lista de tablas"
+        "lista de tablas",
+        "agradecimientos",
+        "no puedo finalizar sin mencionar",
+        "huelva, 2025"
     ]
 
     if any(pattern in lowered for pattern in bad_patterns):
